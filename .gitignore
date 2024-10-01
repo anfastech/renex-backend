@@ -1,0 +1,58 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# FastAPI specific
+*.log
+*.pid
+*.swp
+*.swo
+
+# VSCode and JetBrains project files
+.vscode/
+.idea/
+
+# Migrations (if using Alembic or similar tools)
+migrations/
+alembic/
+
+# Environment variables and credentials
+.env
+.env.local
+*.env
+
+# Pytest cache
+.pytest_cache/
+
+# MongoDB database dump files
+dump/
+*.bson
+*.json
+*.csv
+
+# Docker-related files (if using Docker)
+docker-compose.override.yml
+Dockerfile
+docker-compose.yml
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+
+# Jupyter Notebook checkpoints (if any)
+.ipynb_checkpoints
+
+# OS-specific files
+.D

@@ -1,0 +1,29 @@
+ backend/
+│   │   ├── app/
+│   │   │   ├── __init__.py
+│   │   │   ├── main.py
+│   │   │   ├── database.py
+│   │   │   └── routers.py
+│   │   ├── env/
+│   │   │   ├── include
+│   │   │   ├── Lib
+│   │   │   ├── scripts
+│   │   │   └── pyvenv.cfg
+│   │   ├── .env
+│   │   ├── requirements.txt
+
+renex/
+│
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   └── routers.py
+│   ├── env/
+│   │   ├── include
+│   │   ├── Lib
+│   │   ├── scripts
+│   │   └── pyvenv.cfg
+│   ├── .env
+│   └── requirements.txt
