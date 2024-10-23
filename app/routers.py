@@ -1,105 +1,98 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from bson import ObjectId
 from app.database import get_collection
+from typing import List, Optional
 
 router = APIRouter()
 
-# Define a Pydantic model for the request body
-class Name(BaseModel):
-    name: str
+# Define your PropertyUpdate model
+class Location(BaseModel):
+    city: str
+    address: str
 
-class User(BaseModel):
-    regno: int
-    name: str
-    email: str
-    age: int
-    location: str
+class Image(BaseModel):
+    url: str
+    alt: str
+
+class PropertyUpdate(BaseModel):
+    paid_ad: Optional[bool] = Field(default=None)
+    location: Optional[Location] = Field(default=None)
+    transactionType: Optional[str] = Field(default=None)
+    propertyType: Optional[str] = Field(default=None)
+    image: Optional[Image] = Field(default=None)
+    price: Optional[int] = Field(default=None)
+    features: Optional[List[str]] = Field(default=None)
+    available: Optional[bool] = Field(default=None)
+
+# Define a Pydantic model for Property
+class Property(BaseModel):
+    id: Optional[str] = None  # Make id optional
+    paid_ad: bool
+    location: dict
+    transactionType: str
+    propertyType: str
+    image: dict
+    price: float
+    features: list
+    available: bool
 
 # Helper function to convert MongoDB document to JSON-friendly format
 def convert_to_json(doc):
-    # Convert ObjectId and other non-serializable fields to strings or other serializable formats
     doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
-    if "age" in doc:
-        doc["age"] = int(doc["age"])  # Convert any potential numeric fields properly
-    if "regno" in doc:
-        doc["regno"] = int(doc["regno"])  # Handle regno conversion if it's stored as a BSON type
     return doc
 
-@router.post("/insert_alice")
-async def insert_alice():
-    collection = get_collection("my_database", "my_collection")  # Specify your database and collection names
-    alice_entry = {
-        "regno": 1,
-        "name": "Alice",
-        "email": "alice@example.com",
-        "age": 50,
-        "location": "California",
-    }
+@router.post("/insert_property")
+async def insert_property(property: Property):
+    collection = get_collection("renex", "properties")  # Use your database and collection names
+    
+    # Calculate the document count to generate the ID
+    document_count = await collection.count_documents({})
+    property_id = f"a{document_count + 1}"  # Incrementing by 1 to make the ID unique
+
+    # Add the new ID to the property dictionary
+    property_entry = property.dict()
+    property_entry['id'] = property_id  # Set the new ID
+
     try:
-        result = await collection.insert_one(alice_entry)  # Insert Alice's entry
-        return {"id": str(result.inserted_id), "name": alice_entry["name"]}
+        result = await collection.insert_one(property_entry)  # Insert the property entry
+        return {"id": str(result.inserted_id), "location": property_entry["location"]["address"]}
     except Exception as e:
         return {"error": str(e)}
 
-@router.put("/update_alice/{regno}")
-async def update_alice(regno: int):
-    collection = get_collection("my_database", "my_collection")
-    result = await collection.update_one(
-        {"regno": regno},  # Find the document by regno
-        {"$set": {"age": 50}}  # Update the age to 50
-    )
-    if result.matched_count > 0:
-        return {"message": "Document updated successfully."}
-    else:
-        raise HTTPException(status_code=404, detail="No document matched the query.")
+@router.get("/properties")
+async def get_properties():
+    collection = get_collection("renex", "properties")
+    cursor = collection.find()
+    properties = await cursor.to_list(length=None)  # Convert cursor to a list
 
-@router.post("/dilna")
-async def create_dilna():
-    collection = get_collection("my_database", "my_collection")  # Specify your database and collection names
-    dilna_entry = {
-        "regno": 2,
-        "name": "Dilna",
-        "email": "dilna@example.com",
-        "age": 40,
-        "location": "New York",
-    }
-    
-    # Check if Dilna already exists
-    existing_dilna = await collection.find_one({"regno": 2})
-    
-    if existing_dilna:
-        # If Dilna exists, delete the existing entry
-        await collection.delete_one({"regno": 2})
-    
-    # Insert the new entry for Dilna
-    try:
-        result = await collection.insert_one(dilna_entry)
-        return {"id": str(result.inserted_id), "name": dilna_entry["name"]}
-    except Exception as e:
-        return {"error": str(e)}
-
-@router.get("/db-data")
-async def get_names():
-    collection = get_collection("my_database", "my_collection")  # Use your database and collection names
-    cursor = collection.find()  # Fetch all documents
-    names = await cursor.to_list(length=None)  # Convert cursor to a list
-    
     # Apply the conversion function to all documents in the list
-    converted_names = [convert_to_json(doc) for doc in names]
+    converted_properties = [convert_to_json(doc) for doc in properties]
 
-    return {"names": converted_names}  # Return all documents with BSON types converted to serializable types
+    return {"properties": converted_properties}
 
-# Helper function to extract the "name" field
-def extract_name(doc):
-    return doc.get("name", None)  # Safely get the 'name' field if it exists
-
-@router.get("/names")
-async def get_names():
-    collection = get_collection("my_database", "my_collection")  # Use your database and collection names
-    cursor = collection.find({}, {"name": 1})  # Fetch only the "name" field from documents
-    names = await cursor.to_list(length=None)  # Convert cursor to a list
+# Route to update the property by its 'id' field
+@router.put("/update_property_by_id/{property_id}")
+async def update_property_by_id(property_id: str, property: PropertyUpdate):
+    collection = get_collection("renex", "properties")
+    try:
+        object_id = ObjectId(property_id)  # Convert string to ObjectId
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ObjectId format")
     
-    # Extract the "name" field from each document
-    name_list = [extract_name(doc) for doc in names]
-
-    return {"names": name_list}  # Return only the names
+    update_data = property.dict(exclude_unset=True)  # Only include fields that are set
+    result = await collection.update_one(
+        {"_id": object_id},  # Query by ObjectId
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No property matched the query.")
+    
+    # Optionally retrieve the updated document and return it
+    updated_property = await collection.find_one({"_id": object_id})
+    
+    return {
+        "message": "Property updated successfully.",
+        "updated_property": convert_to_json(updated_property)
+    }

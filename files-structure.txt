@@ -12,6 +12,15 @@
 │   │   ├── .env
 │   │   ├── requirements.txt
 
+
+Method : 
+|  virtual environment env/ activation  |  running uvicorn
+
+* env\Scripts\activate    
+-> http://127.0.0.1:8000/
+* uvicorn app.main:app --reload
+-> http://127.0.0.1:8000
+
 renex/
 │
 ├── backend/
