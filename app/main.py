@@ -8,7 +8,11 @@ app = FastAPI()
 # Allow CORS for your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Adjust this as needed
+    ALLOWED_HOSTS = [
+        "https://renex-backend.onrender.com/",  # Replace with your actual Render domain
+        "https://renexapp.vercel.app",  # Vercel domain for your frontend
+        'http://localhost:3000',  # Local development
+    ],  # Adjust this as needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
