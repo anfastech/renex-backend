@@ -1,12 +1,15 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PositiveFloat
 from bson import ObjectId
 from app.database import get_collection
 from typing import List, Optional
+from bson.errors import InvalidId 
+import logging
+from datetime import datetime
 
 router = APIRouter()
 
-# Define your PropertyUpdate model
+# Models for the property structure
 class Location(BaseModel):
     city: str
     address: str
@@ -15,50 +18,76 @@ class Image(BaseModel):
     url: str
     alt: str
 
-class PropertyUpdate(BaseModel):
-    paid_ad: Optional[bool] = Field(default=None)
-    location: Optional[Location] = Field(default=None)
-    transactionType: Optional[str] = Field(default=None)
-    propertyType: Optional[str] = Field(default=None)
-    image: Optional[Image] = Field(default=None)
-    price: Optional[int] = Field(default=None)
-    features: Optional[List[str]] = Field(default=None)
-    available: Optional[bool] = Field(default=None)
+# class Price(BaseModel):
+#     amount: PositiveFloat  # Define the price amount
 
-# Define a Pydantic model for Property
 class Property(BaseModel):
-    id: Optional[str] = None  # Make id optional
     paid_ad: bool
-    location: dict
+    location: Location
     transactionType: str
     propertyType: str
-    image: dict
-    price: float
-    features: list
+    image: Image  # Assuming image is an object with url and alt attributes
+    price: PositiveFloat 
+    features: List[str]
     available: bool
 
-# Helper function to convert MongoDB document to JSON-friendly format
+class PropertyUpdate(BaseModel):
+    paid_ad: Optional[bool] = None
+    location: Optional[Location] = None
+    transactionType: Optional[str] = None
+    propertyType: Optional[str] = None
+    image: Optional[Image] = None
+    price: Optional[PositiveFloat] = None
+    features: Optional[List[str]] = None
+    available: Optional[bool] = None
+
+# Helper function to convert MongoDB document to a JSON-friendly format
 def convert_to_json(doc):
     doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
     return doc
 
 @router.post("/insert_property")
 async def insert_property(property: Property):
-    collection = get_collection("renex", "properties")  # Use your database and collection names
-    
-    # Calculate the document count to generate the ID
-    document_count = await collection.count_documents({})
-    property_id = f"a{document_count + 1}"  # Incrementing by 1 to make the ID unique
+    logging.info("Received property data: %s", property.dict())
 
-    # Add the new ID to the property dictionary
-    property_entry = property.dict()
-    property_entry['id'] = property_id  # Set the new ID
+    collection = get_collection("renex", "properties")  # Specify your database and collection names
+
+    # Generate a unique property ID
+    document_count = await collection.count_documents({})
+    property_id = f"a{document_count + 1}"
+
+    # Prepare the property entry with nested structure and default values where necessary
+    property_entry = {
+        "id": property_id,
+        "paid_ad": property.paid_ad,  # Assuming 'paid_ad' is a field in your Property model
+        "location": {
+            "city": property.location.city if property.location else "Unknown City",
+            "address": property.location.address if property.location else "No address provided"
+        },
+        "transactionType": property.transactionType,  # Ensure correct attribute name
+        "propertyType": property.propertyType,  # Ensure correct attribute name
+        "image": {
+            "url": property.image.url if property.image else "default-image.png",
+            "alt": f"Building in {property.location.city}" if property.location else "Default building image"
+        },
+        "price": float(property.price) if isinstance(property.price, (int, float, str)) else None,
+        "features": property.features or [],  # Default to an empty list if 'features' is not provided
+        "available": property.available if property.available is not None else True,  # Default availability
+        "updatedAt": datetime.now() 
+    }
 
     try:
-        result = await collection.insert_one(property_entry)  # Insert the property entry
-        return {"id": str(result.inserted_id), "location": property_entry["location"]["address"]}
+        # Insert the property entry into the database
+        result = await collection.insert_one(property_entry)
+        return {
+            "id": str(result.inserted_id),
+            "location": property_entry["location"]["address"],
+            "message": "Property added successfully!"
+        }
     except Exception as e:
-        return {"error": str(e)}
+        logging.error("Error inserting property: %s", str(e))
+        raise HTTPException(status_code=500, detail="Error inserting property into the database.")
+
 
 @router.get("/properties")
 async def get_properties():
@@ -75,24 +104,26 @@ async def get_properties():
 @router.put("/update_property_by_id/{property_id}")
 async def update_property_by_id(property_id: str, property: PropertyUpdate):
     collection = get_collection("renex", "properties")
+
+    # Build update data
+    update_data = {k: v for k, v in property.dict(exclude_unset=True).items()}
+    
     try:
-        object_id = ObjectId(property_id)  # Convert string to ObjectId
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid ObjectId format")
-    
-    update_data = property.dict(exclude_unset=True)  # Only include fields that are set
-    result = await collection.update_one(
-        {"_id": object_id},  # Query by ObjectId
-        {"$set": update_data}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="No property matched the query.")
-    
-    # Optionally retrieve the updated document and return it
-    updated_property = await collection.find_one({"_id": object_id})
-    
-    return {
-        "message": "Property updated successfully.",
-        "updated_property": convert_to_json(updated_property)
-    }
+        result = await collection.update_one(
+            {"id": property_id},  # Match by custom `id`
+            {"$set": update_data}  # Set only fields that have been updated
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="No property matched the query.")
+        
+        # Optionally retrieve and return the updated document
+        updated_property = await collection.find_one({"id": property_id})
+        return {
+            "message": "Property updated successfully.",
+            "updated_property": convert_to_json(updated_property)
+        }
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid ObjectId format.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
