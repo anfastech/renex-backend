@@ -5,7 +5,9 @@ from app.database import get_collection
 from typing import List, Optional
 from bson.errors import InvalidId 
 import logging
+from bson import ObjectId
 from datetime import datetime
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -17,6 +19,11 @@ class Location(BaseModel):
 class Image(BaseModel):
     url: str
     alt: str
+    
+class User(BaseModel):
+    email: str
+    name: str
+    mobile: str  # Add mobile field
 
 # class Price(BaseModel):
 #     amount: PositiveFloat  # Define the price amount
@@ -41,6 +48,13 @@ class PropertyUpdate(BaseModel):
     features: Optional[List[str]] = None
     available: Optional[bool] = None
 
+router = APIRouter()
+
+class User(BaseModel):
+    email: str
+    name: str
+    image: str
+    
 # Helper function to convert MongoDB document to a JSON-friendly format
 def convert_to_json(doc):
     doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
@@ -127,3 +141,53 @@ async def update_property_by_id(property_id: str, property: PropertyUpdate):
         raise HTTPException(status_code=400, detail="Invalid ObjectId format.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.get("/properties/{property_id}")
+async def get_property(property_id: str):
+    try:
+        object_id = ObjectId(property_id)  # Validate and convert string to ObjectId
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid ID format.")
+
+    collection = get_collection("renex", "properties")
+    property_data = await collection.find_one({"_id": object_id})  # Use _id to find document
+    if not property_data:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return convert_to_json(property_data)
+
+
+# @router.post("/auth/users")
+# async def signup(user: User):
+#     collection = get_collection("renex", "users")  # Specify your MongoDB collection
+#     existing_user = await collection.find_one({"email": user.email})
+
+#     if existing_user:
+#         raise HTTPException(status_code=400, detail="User already exists")
+
+#     new_user = {
+#         "email": user.email,
+#         "name": user.name,
+#         "mobile": user.mobile,  # Store mobile number
+#     }
+
+#     result = await collection.insert_one(new_user)
+#     return {"id": str(result.inserted_id), "message": "User created successfully!"}
+
+# @router.post("/auth/users")
+# async def signup(user: User):
+#     collection = get_collection("renex", "users")  # Specify your MongoDB collection
+#     existing_user = await collection.find_one({"email": user.email})
+
+#     if existing_user:
+#         raise HTTPException(status_code=400, detail="User already exists")
+
+#     new_user = {
+#         "email": user.email,
+#         "name": user.name,
+#         "image": user.picture,
+#         # Optionally, add additional fields like mobile number, date of birth, etc.
+#     }
+
+#     result = await collection.insert_one(new_user)
+#     return {"id": str(result.inserted_id), "message": "User created successfully!"}

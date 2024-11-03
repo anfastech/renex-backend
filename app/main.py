@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import router
-from app.database import get_collection, get_mongo_client  # Import Mongo client
+from app.routers.users_routers import router as users_router  # Import the users router
+from app.routers.property_routers import router as property_router  # Import the properties router
+from app.database import get_collection, get_mongo_client  # Import MongoDB client
 
 app = FastAPI()
 
@@ -12,14 +13,15 @@ app.add_middleware(
         "https://renex-backend.onrender.com",  # Replace with your actual Render domain
         "https://renexapp.vercel.app",         # Vercel domain for your frontend
         "http://localhost:3000"                # Local development
-    ], # Adjust this as needed
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include the router
-app.include_router(router)
+# Include routers
+app.include_router(users_router, prefix="/users", tags=["users"])  # Users router
+app.include_router(property_router, prefix="/properties", tags=["properties"])  # Properties router
 
 # Global variable to store MongoDB connection status
 mongo_status = "Unknown"
@@ -31,7 +33,6 @@ async def check_mongo_connection():
     try:
         # Get MongoDB client
         client = get_mongo_client()
-
         # Use the 'admin' database to run the 'ping' command
         await client.admin.command("ping")
         mongo_status = "MongoDB is connected."
@@ -41,3 +42,4 @@ async def check_mongo_connection():
 @app.get("/")
 async def root():
     return {"message": "Welcome to the FastAPI backend!", "mongo_status": mongo_status}
+
