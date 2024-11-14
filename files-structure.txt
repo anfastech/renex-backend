@@ -35,4 +35,5 @@ renex/
 │   │   ├── scripts
 │   │   └── pyvenv.cfg
 │   ├── .env
+│   ├── settings.py
 │   └── requirements.txt
