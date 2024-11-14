@@ -26,10 +26,10 @@ This command will:
 
 ### Project Structure
 - app/
- - main.py: The main entry point for the FastAPI application.
- - routers/: Directory containing route files for different API endpoints.
- - database.py: Contains database connection setup.
- - __init__.py: Initializes the app package.
+  - main.py: The main entry point for the FastAPI application.
+  - routers/: Directory containing route files for different API endpoints.
+  - database.py: Contains database connection setup.
+  - __init__.py: Initializes the app package.
 
 ### API Documentation
 FastAPI automatically generates documentation for your API. Once the server is running, you can access it at:
