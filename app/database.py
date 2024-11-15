@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
-
+# to connect data base 
 MONGODB_URL = os.getenv("MONGODB_URL")  # Ensure your environment variable is set
 
 client = None
